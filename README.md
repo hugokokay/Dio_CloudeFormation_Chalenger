@@ -228,7 +228,30 @@ Este projeto é muito econômico:
 
 ---
 
-## 🗑️ Limpeza (Remover Recursos)
+## � Screenshots da Implementação
+
+### CloudFormation - Criação da Stack
+
+![CloudFormation Stack Creation](Imagens/CludeFormation01.png)
+*Tela de criação da stack no AWS CloudFormation Console*
+
+---
+
+### Amazon S3 - Bucket com Arquivos
+
+![S3 Bucket with Files](Imagens/CludeFormation02.png)
+*Bucket S3 contendo os arquivos do website (index.html, style.css, script.js)*
+
+---
+
+### CloudFront - Distribuição Ativa
+
+![CloudFront Distribution](Imagens/CludeFormation03.png)
+*Distribuição CloudFront ativa servindo o conteúdo do S3 via HTTPS*
+
+---
+
+## �🗑️ Limpeza (Remover Recursos)
 
 Para evitar custos desnecessários, você pode deletar a stack:
 
