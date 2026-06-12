@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Projeto Bootcamp DIO GFT - Fundamentos de Cloud com AWS: Site Estático Seguro e Global.
+  Arquitetura: S3 (Privado) + CloudFront (com OAC) + HTTPS Gratuito.
+  Bucket Name: dio-cloudformation-chalenger-2026
+
+# PARÂMETROS
+
+Parameters:
+  IndexDocument:
+    Type: String
+    Default: index.html
+    Description: "Nome do arquivo principal do site."
+
+# RECURSOS
+
+Resources:
+  # 1. Bucket S3 para hospedar os arquivos
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      # Nome fixo e válido para o S3 (minúsculas e hífens)
+      BucketName: dio-cloudformation-chalenger-2026
+      WebsiteConfiguration:
+        IndexDocument: !Ref IndexDocument
+      # Bloqueia TODO acesso público direto ao bucket (Mais segurança)
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # 2. Controle de Acesso de Origem (OAC) do CloudFront
+  CloudFrontOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: OAC-dio-cloudformation-chalenger
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # 3. Distribuição CloudFront (CDN + HTTPS)
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: !Ref IndexDocument
+        # Configuração de HTTPS gratuito (Certificado padrão *.cloudfront.net)
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+          MinimumProtocolVersion: TLSv1.2_2021
+        Origins:
+          - Id: S3Origin
+            DomainName: !GetAtt WebsiteBucket.RegionalDomainName
+            S3OriginConfig:
+              OriginAccessIdentity: "" # Deixado vazio porque estamos usando OAC
+            OriginAccessControlId: !GetAtt CloudFrontOAC.Id # Vincula o OAC criado acima
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https # Força todo tráfego HTTP a virar HTTPS
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          Compress: true # Habilita compressão Gzip/Brotli para economizar banda
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+
+  # 4. Política do Bucket (Bucket Policy)
+  # Autoriza APENAS o CloudFront (através do OAC) a ler os arquivos do S3
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: 's3:GetObject'
+            Resource: !Sub "${WebsiteBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                # Garante que apenas ESTA distribuição CloudFront específica pode acessar
+                AWS:SourceArn: !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}"
+
+# SAÍDAS (OUTPUTS)
+
+Outputs:
+  WebsiteURL:
+    Description: "URL final do seu site seguro (HTTPS)"
+    Value: !Sub "https://${CloudFrontDistribution.DomainName}"
+  
+  S3BucketName:
+    Description: "Nome do bucket S3 criado"
+    Value: !Ref WebsiteBucket
+    
+  CloudFrontDistributionId:
+    Description: "ID da distribuição CloudFront"
+    Value: !Ref CloudFrontDistribution
